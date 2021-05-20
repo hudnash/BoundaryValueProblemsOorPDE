@@ -10,40 +10,39 @@ clf
 % derivative condition (ie, a gradient bound). This is DIFFERENT from the
 % setup used in "finitedifference.m."
 
-global Da % Damkohler number
-Da = 12.0;
-yrange = [0 1]; % symmetric function
-psiTrialRange = [0 1];
-[y,psi] = shootfirst(@phif,@(idk1)[idk1,0],@(idk2)[1,idk2],.001,psiTrialRange,yrange,100);
-
-
-function dpsidy = phif(y,psi)
 global Da
-dpsidy(1) = psi(2);
-dpsidy(2) = psi(1)*Da;
-dpsidy = dpsidy';
+Da = 12.0; p1(2) = 1; p2(1) = 0;
+           p1(1) = 0.5; % 1st guess of initial condition
+           p1_2(1) = .25; % 2nd guess of initial condition
+[y,psi]=secshoot(@psidif,p1(2),p2(1),[0 1],.001,p1(1),p1_2(1));
+hold on
+psi
+plot(y,psi(:,1),'-r');
+Da = 1.0;
+[y,psi]=secshoot(@psidif,p1(2),p2(1),[0 1],.001,p1(1),p1_2(1));
+plot(y,psi(:,2),'-b');
+
+
+function dpdt = psidif(y,p)
+global Da
+dpdt(1) = p(2);
+dpdt(2) = Da*p(1);
+dpdt = dpdt';
 end
 
-function [y,psi] = shootfirst(dpsidy,psi0,psi1,TOL,psiTrialRange,yrange,N)
-didk = (psiTrialRange(2)-psiTrialRange(1))/N;
-idk1 = psiTrialRange(1); y = linspace(yrange(1),yrange(2),N);
-f = ode45(@phif,[0,1],idk1); % "psi0(idk)" is equivalent to "[idk 0]" here.
-if abs(f(idk1)) > TOL
-    idk1 = idk1-f(idk1)/(f(idk1)-f(idk1-didk))*didk; % didk is step size... how to implement adaptive step in this kind of algorithm? what is err?
-    while abs(f(idk1)) < TOL
-    idk1 = idk1 - f(idk1)/(f(idk1+didk)-f(idk1-didk))*2*didk;
-    end
+function [t,y] = secshoot(dydt,y1_end,y2_start,trange,TOL,idk1guess,idk2guess) % idk = y1_start !!!
+[t,y]=ode45(dydt,trange,[idk1guess y2_start]);
+err0 = y1_end - y(end); err = TOL+5; idk0 = idk1guess; idk = idk2guess;
+while abs(err) > TOL
+   [t,y]=ode45(dydt,trange,[idk y2_start]);
+   err=y1_end-y(end);
+   idkold=idk;
+   idk = idk-err/(err-err0)*(idk-idk0);
+   %[idkold, idk0, idk]
+   %[err0,err]
+   [y1_end,y(end),t(end)]
+   err0=err;
+   idk0=idkold;
+   plot(t,y(:,1),'o');
 end
-%{
-idk2 = psiTrialRange(1);
-f = ode45(@phif,[0 1],psi1(idk2)); % "psi1(idk)" is equivalent to "[idk 0]" here.
-if abs(f(idk2)) > TOL
-    idk2 = idk2-f(idk2)/(f(idk2)-f(idk2-didk))*didk; % didk is step size... how to implement adaptive step in this kind of algorithm? what is err?
-    while abs(f(idk2)) < TOL
-    idk2 = idk2 - f(idk2)/(f(idk2+didk)-f(idk2-didk))*2*didk;
-    end
-end
-psi = -ode45(@phif,[0 1],psi0(idk1))*Da
-%}
-% Above code block is unnecessary as, in this use case, psi(1) = psi!!!
 end
